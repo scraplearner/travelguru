@@ -1,17 +1,27 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UserProfile } from '../types/travel';
-import { authenticateUser, registerUser, createGuestUser, getAllUsers } from '../data.js';
+import { UserProfile, SavedTrip } from '../types/travel';
+import { authenticateUser, registerUser, createGuestUser } from '../data.js';
+import { generateJWT, verifyAndDecodeJWT, clearJWTToken, JWTTokenSession } from '../services/jwtAuthService';
+import { getSavedTrips, createSavedTrip, updateSavedTrip, deleteSavedTrip } from '../services/savedTripsService';
 
 interface AuthContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isTransitioning: boolean;
+  jwtToken: string | null;
+  jwtSession: JWTTokenSession | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { name: string; email: string; password: string; membership?: 'Explorer' | 'Voyager Gold' | 'Globetrotter VIP'; preferredStyle?: any }) => Promise<void>;
   loginAsGuest: () => void;
   logout: () => void;
-  savedTrips: string[];
-  saveTrip: (tripTitle: string) => void;
+  // Saved Trips CRUD
+  savedTrips: SavedTrip[];
+  createTrip: (tripData: any) => SavedTrip;
+  editTrip: (tripId: string, updates: Partial<SavedTrip>) => SavedTrip;
+  removeTrip: (tripId: string) => boolean;
+  refreshSavedTrips: () => void;
+  isSavedTripsModalOpen: boolean;
+  setIsSavedTripsModalOpen: (open: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,31 +32,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [savedTrips, setSavedTrips] = useState<string[]>(() => {
-    const saved = localStorage.getItem('travel_guru_saved_trips');
-    return saved ? JSON.parse(saved) : [];
+  const [jwtToken, setJwtToken] = useState<string | null>(() => {
+    return localStorage.getItem('travel_guru_jwt_token');
   });
+
+  const [jwtSession, setJwtSession] = useState<JWTTokenSession | null>(() => {
+    return verifyAndDecodeJWT();
+  });
+
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [isSavedTripsModalOpen, setIsSavedTripsModalOpen] = useState(false);
+
+  // Load trips whenever user changes
+  const refreshSavedTrips = () => {
+    if (user) {
+      const trips = getSavedTrips(user.id);
+      setSavedTrips(trips);
+    } else {
+      setSavedTrips([]);
+    }
+  };
 
   useEffect(() => {
     if (user) {
       localStorage.setItem('travel_guru_user', JSON.stringify(user));
+      // Ensure valid JWT exists
+      const session = verifyAndDecodeJWT();
+      if (!session || !session.isValid) {
+        const token = generateJWT(user);
+        setJwtToken(token);
+        setJwtSession(verifyAndDecodeJWT(token));
+      } else {
+        setJwtToken(session.token);
+        setJwtSession(session);
+      }
+      refreshSavedTrips();
     } else {
       localStorage.removeItem('travel_guru_user');
+      clearJWTToken();
+      setJwtToken(null);
+      setJwtSession(null);
+      setSavedTrips([]);
     }
   }, [user]);
 
   const triggerLoginTransition = (profile: UserProfile) => {
     setIsTransitioning(true);
+    const token = generateJWT(profile);
+    setJwtToken(token);
+    setJwtSession(verifyAndDecodeJWT(token));
+
     setTimeout(() => {
       setUser(profile);
-      if (profile.savedTrips && profile.savedTrips.length > 0) {
-        setSavedTrips(prev => {
-          const combined = Array.from(new Set([...prev, ...(profile.savedTrips || [])]));
-          localStorage.setItem('travel_guru_saved_trips', JSON.stringify(combined));
-          return combined;
-        });
-      }
       setTimeout(() => {
         setIsTransitioning(false);
       }, 1200);
@@ -54,7 +92,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
-    // Authenticate against data.js database
     const profile = authenticateUser(email, password) as UserProfile;
     triggerLoginTransition(profile);
   };
@@ -77,15 +114,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
+    clearJWTToken();
     localStorage.removeItem('travel_guru_user');
+    setIsSavedTripsModalOpen(false);
   };
 
-  const saveTrip = (tripTitle: string) => {
-    setSavedTrips(prev => {
-      const updated = prev.includes(tripTitle) ? prev : [...prev, tripTitle];
-      localStorage.setItem('travel_guru_saved_trips', JSON.stringify(updated));
-      return updated;
+  // CRUD Operations for Saved Trips
+  const createTrip = (tripData: any) => {
+    if (!user) throw new Error('Please sign in to save trips.');
+    const newTrip = createSavedTrip({
+      ...tripData,
+      userId: user.id
     });
+    refreshSavedTrips();
+    return newTrip;
+  };
+
+  const editTrip = (tripId: string, updates: Partial<SavedTrip>) => {
+    const updated = updateSavedTrip(tripId, updates);
+    refreshSavedTrips();
+    return updated;
+  };
+
+  const removeTrip = (tripId: string) => {
+    const res = deleteSavedTrip(tripId);
+    refreshSavedTrips();
+    return res;
   };
 
   return (
@@ -94,12 +148,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         isAuthenticated: !!user,
         isTransitioning,
+        jwtToken,
+        jwtSession,
         login,
         register,
         loginAsGuest,
         logout,
         savedTrips,
-        saveTrip
+        createTrip,
+        editTrip,
+        removeTrip,
+        refreshSavedTrips,
+        isSavedTripsModalOpen,
+        setIsSavedTripsModalOpen
       }}
     >
       {children}

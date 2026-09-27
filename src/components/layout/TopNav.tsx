@@ -1,9 +1,9 @@
 import React from 'react';
-import { Compass, LogOut, Globe, ChevronDown } from 'lucide-react';
+import { Compass, LogOut, Globe, ChevronDown, FolderHeart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const TopNav: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, savedTrips, setIsSavedTripsModalOpen } = useAuth();
 
   return (
     <header className="site-header-nav stitch-header">
@@ -34,6 +34,18 @@ export const TopNav: React.FC = () => {
 
         {/* Right Utility & Profile */}
         <div className="nav-actions-group">
+          {/* Saved Trips Database Trigger Button */}
+          <button
+            type="button"
+            className="btn-nav-saved-trips"
+            onClick={() => setIsSavedTripsModalOpen(true)}
+            title="Open Saved Expeditions Database (CRUD)"
+          >
+            <FolderHeart size={15} className="text-flight-sky" />
+            <span>Saved Trips</span>
+            <span className="nav-saved-count">{savedTrips.length}</span>
+          </button>
+
           {user && (
             <div className="user-profile-widget">
               <div className="user-avatar-placeholder">

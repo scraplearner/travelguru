@@ -9,6 +9,7 @@ import { TravelSearchForm } from './components/travel/TravelSearchForm';
 import { RecommendationList } from './components/travel/RecommendationList';
 import { AIPlannerSection } from './components/travel/AIPlannerSection';
 import { PrefilledBookingModal } from './components/travel/PrefilledBookingModal';
+import { SavedTripsModal } from './components/travel/SavedTripsModal';
 
 export const App: React.FC = () => {
   const { isAuthenticated, isTransitioning, user } = useAuth();
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
           </main>
 
           <PrefilledBookingModal />
+          <SavedTripsModal />
           <Footer />
         </div>
       )}

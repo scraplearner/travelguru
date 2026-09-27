@@ -1,15 +1,34 @@
 import React, { useState } from 'react';
-import { Sparkles, Calendar, Clock, DollarSign, Compass, Utensils, MapPin, Shield, CheckCircle2, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
+import { 
+  Sparkles, 
+  Calendar, 
+  Clock, 
+  Compass, 
+  Utensils, 
+  MapPin, 
+  CheckCircle2, 
+  ChevronDown, 
+  ChevronUp, 
+  CloudRain,
+  Sun,
+  Umbrella,
+  BookmarkCheck,
+  FolderHeart,
+  RefreshCw
+} from 'lucide-react';
 import { useTravel } from '../../context/TravelContext';
+import { useAuth } from '../../context/AuthContext';
 import { TravelStyle } from '../../types/travel';
 
 export const AIPlannerSection: React.FC = () => {
-  const { searchQuery, setSearchQuery, budgetPlan, itinerary, searchTravel, isLoading } = useTravel();
+  const { searchQuery, setSearchQuery, budgetPlan, itinerary, weather, simulateRainDay2, toggleRainSimulation, searchTravel, isLoading } = useTravel();
+  const { createTrip, setIsSavedTripsModalOpen } = useAuth();
 
   const [days, setDays] = useState(searchQuery.tripDays || 4);
   const [startDate, setStartDate] = useState(searchQuery.departureDate);
   const [travelStyle, setTravelStyle] = useState<TravelStyle>(searchQuery.travelStyle || 'balanced');
   const [expandedDay, setExpandedDay] = useState<number | null>(1);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleGeneratePlan = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +43,31 @@ export const AIPlannerSection: React.FC = () => {
 
   const toggleDay = (dayNum: number) => {
     setExpandedDay(prev => (prev === dayNum ? null : dayNum));
+  };
+
+  const handleSaveTripToDatabase = () => {
+    if (!itinerary || !budgetPlan) return;
+    try {
+      createTrip({
+        title: `${searchQuery.destination} ${days}-Day Expedition`,
+        origin: searchQuery.origin,
+        destination: searchQuery.destination,
+        departureDate: startDate,
+        travelers: searchQuery.travelers,
+        tripDays: days,
+        totalBudgetINR: budgetPlan.totalINR,
+        itinerary,
+        notes: weather?.hasRainAlert 
+          ? `Day ${weather.rainAlertDay} Rain adaptation active: Outdoor activities proactively swapped for indoor art and heritage museums.` 
+          : 'Planned with Travel Guru AI multi-modal engine.',
+        hasWeatherAdaptation: weather?.hasRainAlert,
+        weatherAlert: weather?.hasRainAlert ? `Day ${weather.rainAlertDay} Rain-Adapted` : undefined
+      });
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
+    } catch (e: any) {
+      alert(e.message || 'Please log in to save trips.');
+    }
   };
 
   return (
@@ -114,6 +158,66 @@ export const AIPlannerSection: React.FC = () => {
             Duration: <strong>{days} Days</strong> starting on <strong>{startDate}</strong>
           </span>
         </div>
+
+        {/* Dynamic Weather Forecast & Rain Adaptation Showcase */}
+        {weather && (
+          <div className="destination-weather-showcase">
+            <div className="weather-overview-bar">
+              <div className="weather-city-meta">
+                <div className="weather-temp-badge">
+                  {weather.condition.includes('Rain') ? <CloudRain size={22} className="text-flight-sky" /> : <Sun size={22} className="text-amber" />}
+                  <span className="weather-temp-num">{weather.currentTempC}°C</span>
+                </div>
+                <div className="weather-city-details">
+                  <span className="weather-dest-name">{weather.destination}</span>
+                  <span className="weather-cond-label">{weather.condition} • {weather.source}</span>
+                </div>
+              </div>
+
+              {/* Day-by-Day Forecast Mini Pills */}
+              <div className="weather-days-mini-strip">
+                {weather.forecast.map(f => (
+                  <div key={f.dayNumber} className={`weather-mini-day-pill ${f.isRainy ? 'rainy' : 'sunny'}`}>
+                    <span className="mini-day-num">Day {f.dayNumber}</span>
+                    <span className="mini-day-icon">{f.isRainy ? '🌧️' : '☀️'}</span>
+                    <span className="mini-day-temp">{f.tempMaxC}°</span>
+                    {f.isRainy && <span className="mini-rain-pct">{f.precipitationChance}% rain</span>}
+                  </div>
+                ))}
+              </div>
+
+              {/* Interactive Rain Simulation Toggle */}
+              <button
+                type="button"
+                className={`btn-rain-simulation-toggle ${simulateRainDay2 ? 'active' : ''}`}
+                onClick={toggleRainSimulation}
+                title="Toggle simulation of heavy rain on Day 2 to test dynamic indoor activity adaptation"
+              >
+                <Umbrella size={14} />
+                <span>Day 2 Rain Sim: <strong>{simulateRainDay2 ? 'ACTIVE' : 'OFF'}</strong></span>
+                <RefreshCw size={12} />
+              </button>
+            </div>
+
+            {/* Smart Rain Adaptation Callout Banner */}
+            {weather.hasRainAlert && (
+              <div className="weather-adaptation-alert-banner">
+                <div className="alert-banner-icon">
+                  <CloudRain size={22} className="text-flight-sky" />
+                </div>
+                <div className="alert-banner-content">
+                  <div className="alert-banner-title">
+                    <span>🌧️ Weather-Based Itinerary Adaptation: Heavy Rain Predicted on Day {weather.rainAlertDay} ({weather.rainDayPrecipitation}% Precip)</span>
+                  </div>
+                  <p className="alert-banner-desc">
+                    To prevent weather disruptions, our AI planner automatically swapped outdoor sightseeing (beaches, fort treks & walking trails) for premier indoor museums, contemporary art galleries, and covered heritage dining!
+                  </p>
+                </div>
+                <span className="adaptation-verified-tag">✓ Dynamic AI Swap</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Budget Breakdown & Daily Plan Display */}
         {budgetPlan && (
@@ -216,19 +320,48 @@ export const AIPlannerSection: React.FC = () => {
           </div>
         )}
 
-        {/* Day-by-Day Itinerary Section */}
+        {/* Day-by-Day Itinerary Section with Weather Badges & Save Action */}
         {itinerary && itinerary.length > 0 && (
           <div className="itinerary-accordion-section">
-            <h3 className="itinerary-section-heading">
-              📅 Curated {itinerary.length}-Day Itinerary for {searchQuery.destination}
-            </h3>
+            <div className="itinerary-section-header-row">
+              <h3 className="itinerary-section-heading">
+                📅 Curated {itinerary.length}-Day Itinerary for {searchQuery.destination}
+              </h3>
+              <div className="itinerary-header-buttons">
+                <button
+                  type="button"
+                  className={`btn-save-itinerary-db ${savedSuccess ? 'saved' : ''}`}
+                  onClick={handleSaveTripToDatabase}
+                >
+                  {savedSuccess ? (
+                    <>
+                      <CheckCircle2 size={16} className="text-emerald" />
+                      <span>Saved to Database!</span>
+                    </>
+                  ) : (
+                    <>
+                      <BookmarkCheck size={16} />
+                      <span>Save Trip (CRUD)</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn-view-saved-modal"
+                  onClick={() => setIsSavedTripsModalOpen(true)}
+                >
+                  <FolderHeart size={16} />
+                  <span>My Saved Trips</span>
+                </button>
+              </div>
+            </div>
 
             <div className="days-stack">
               {itinerary.map(day => {
                 const isOpen = expandedDay === day.dayNumber;
 
                 return (
-                  <div key={day.dayNumber} className={`day-accordion-card ${isOpen ? 'open' : ''}`}>
+                  <div key={day.dayNumber} className={`day-accordion-card ${isOpen ? 'open' : ''} ${day.isAdaptedIndoor ? 'adapted-weather' : ''}`}>
                     <button
                       type="button"
                       className="day-accordion-header"
@@ -238,6 +371,11 @@ export const AIPlannerSection: React.FC = () => {
                         <span className="day-badge-chip">Day {day.dayNumber}</span>
                         <h4>{day.title}</h4>
                         <span className="day-theme-tag">{day.theme}</span>
+                        {day.weather && (
+                          <span className={`day-weather-status-chip ${day.weather.isRainy ? 'rainy' : 'sunny'}`}>
+                            {day.weather.isRainy ? '🌧️' : '☀️'} {day.weather.tempMaxC}°C · {day.isAdaptedIndoor ? 'Indoor Adapted' : 'Clear Outdoor'}
+                          </span>
+                        )}
                       </div>
                       <div className="day-header-right">
                         {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -246,6 +384,13 @@ export const AIPlannerSection: React.FC = () => {
 
                     {isOpen && (
                       <div className="day-accordion-body">
+                        {/* Weather adaptation callout banner inside day */}
+                        {day.adaptationNotice && (
+                          <div className="day-adaptation-notice-box">
+                            <Umbrella size={16} className="text-flight-sky" />
+                            <span>{day.adaptationNotice}</span>
+                          </div>
+                        )}
                         <div className="activity-slots-grid">
                           {/* Morning */}
                           <div className="activity-slot-item">

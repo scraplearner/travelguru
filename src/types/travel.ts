@@ -42,27 +42,58 @@ export interface BudgetBreakdown {
   exchangeRateToUSD: number;
 }
 
+export interface DayWeather {
+  dayNumber: number;
+  date: string;
+  tempMaxC: number;
+  tempMinC: number;
+  condition: string;
+  conditionCode: number;
+  precipitationChance: number;
+  isRainy: boolean;
+  adaptedToIndoor: boolean;
+  adaptationNotice?: string;
+}
+
+export interface DestinationWeather {
+  destination: string;
+  currentTempC: number;
+  condition: string;
+  forecast: DayWeather[];
+  hasRainAlert: boolean;
+  rainAlertDay?: number;
+  rainDayPrecipitation?: number;
+  source: string;
+}
+
 export interface ItineraryDay {
   dayNumber: number;
   title: string;
   theme: string;
+  weather?: DayWeather;
+  isAdaptedIndoor?: boolean;
+  adaptationNotice?: string;
+  originalOutdoorActivity?: string;
   morning: {
     activity: string;
     location: string;
     costINR: number;
     tip: string;
+    isIndoor?: boolean;
   };
   afternoon: {
     activity: string;
     location: string;
     costINR: number;
     tip: string;
+    isIndoor?: boolean;
   };
   evening: {
     activity: string;
     location: string;
     costINR: number;
     tip: string;
+    isIndoor?: boolean;
   };
   recommendedFood: string[];
   localTransport: string;
@@ -77,6 +108,7 @@ export interface AIPackagePlan {
   itinerary: ItineraryDay[];
   travelOptions: TravelOption[];
   localInsiderTips: string[];
+  weatherForecast?: DestinationWeather;
   aiGenerated: boolean;
   generatedAt: string;
 }
@@ -108,3 +140,25 @@ export interface UserProfile {
   savedTrips?: string[];
   bio?: string;
 }
+
+export interface SavedTrip {
+  id: string;
+  userId: string;
+  title: string;
+  origin: string;
+  destination: string;
+  departureDate: string;
+  travelers: number;
+  tripDays: number;
+  totalBudgetINR: number;
+  itinerary: ItineraryDay[];
+  selectedOption?: TravelOption;
+  notes: string;
+  status: 'planned' | 'in-progress' | 'completed';
+  tags: string[];
+  weatherAlert?: string;
+  hasWeatherAdaptation?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
